@@ -1,4 +1,4 @@
-package cl.bosqueantiguo.ventas.controller;
+﻿package cl.bosqueantiguo.ventas.controller;
 
 import cl.bosqueantiguo.ventas.dto.VentaRequestDTO;
 import cl.bosqueantiguo.ventas.dto.VentaResponseDTO;
@@ -49,26 +49,49 @@ public class VentaController {
         return new ResponseEntity<>(ventaRegistrada, HttpStatus.CREATED);
     }
 
-    @Operation(summary = "Listar todas las ventas", description = "Obtiene todas las ventas registradas en el sistema")
+    @Operation(summary = "Listar todas las ventas", description = "Obtiene todas las ventas registradas - Solo ADMIN y VENDEDOR")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lista de ventas obtenida exitosamente",
-            content = @Content(schema = @Schema(implementation = VentaResponseDTO.class)))
+            content = @Content(schema = @Schema(implementation = VentaResponseDTO.class))),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado - Solo ADMIN y VENDEDOR")
     })
     @GetMapping
-    public ResponseEntity<List<VentaResponseDTO>> listarVentas() {
+    public ResponseEntity<List<VentaResponseDTO>> listarVentas(Authentication authentication) {
+        // Solo ADMIN y VENDEDOR pueden ver todas las ventas
+        boolean isAdminOrVendedor = authentication.getAuthorities().stream()
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
+        
+        if (!isAdminOrVendedor) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        
         List<VentaResponseDTO> ventas = ventaService.listarVentas();
         return ResponseEntity.ok(ventas);
     }
 
-    @Operation(summary = "Obtener venta por ID", description = "Obtiene una venta específica por su ID")
+    @Operation(summary = "Obtener venta por ID", description = "Obtiene una venta específica - ADMIN/VENDEDOR ven todo, CLIENTE solo sus ventas")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Venta encontrada",
             content = @Content(schema = @Schema(implementation = VentaResponseDTO.class))),
-        @ApiResponse(responseCode = "404", description = "Venta no encontrada")
+        @ApiResponse(responseCode = "404", description = "Venta no encontrada"),
+        @ApiResponse(responseCode = "403", description = "Acceso denegado")
     })
     @GetMapping("/{id}")
-    public ResponseEntity<VentaResponseDTO> obtenerVentaPorId(@PathVariable Long id) {
+    public ResponseEntity<VentaResponseDTO> obtenerVentaPorId(@PathVariable Long id, Authentication authentication) {
         VentaResponseDTO venta = ventaService.obtenerVentaPorId(id);
+        
+        // ADMIN y VENDEDOR pueden ver cualquier venta
+        boolean isAdminOrVendedor = authentication.getAuthorities().stream()
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
+        
+        if (!isAdminOrVendedor) {
+            // CLIENTE solo puede ver sus propias ventas
+            Long currentUserId = Long.parseLong(authentication.getDetails().toString());
+            if (!currentUserId.equals(venta.getUsuarioId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        }
+        
         return ResponseEntity.ok(venta);
     }
 

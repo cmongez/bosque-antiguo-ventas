@@ -1,4 +1,4 @@
-package cl.bosqueantiguo.ventas.config;
+﻿package cl.bosqueantiguo.ventas.config;
 
 import java.util.List;
 
@@ -28,8 +28,18 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/public/**").permitAll()
-                .requestMatchers("/api/v1/sales").hasRole("ADMIN") // Solo admin puede listar todas las ventas
+                // Rutas públicas
+                .requestMatchers("/api/v1/public/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                // Crear venta: todos los usuarios autenticados (CLIENTE, VENDEDOR, ADMIN)
+                .requestMatchers("POST", "/api/v1/sales").hasAnyRole("CLIENTE", "VENDEDOR", "ADMIN")
+                // Listar todas las ventas: solo ADMIN y VENDEDOR
+                .requestMatchers("GET", "/api/v1/sales").hasAnyRole("ADMIN", "VENDEDOR") 
+                // Mis compras: todos los autenticados
+                .requestMatchers("GET", "/api/v1/sales/my-orders").hasAnyRole("CLIENTE", "VENDEDOR", "ADMIN")
+                // Ventas por usuario: ADMIN puede ver de cualquiera, otros solo las suyas
+                .requestMatchers("GET", "/api/v1/sales/user/**").hasAnyRole("CLIENTE", "VENDEDOR", "ADMIN")
+                // Venta específica: control en el controlador
+                .requestMatchers("GET", "/api/v1/sales/**").hasAnyRole("CLIENTE", "VENDEDOR", "ADMIN")
                 .anyRequest().authenticated()
             )
             .httpBasic(httpBasic -> httpBasic.disable())

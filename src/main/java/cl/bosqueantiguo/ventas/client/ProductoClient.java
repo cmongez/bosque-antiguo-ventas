@@ -1,4 +1,4 @@
-package cl.bosqueantiguo.ventas.client;
+﻿package cl.bosqueantiguo.ventas.client;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

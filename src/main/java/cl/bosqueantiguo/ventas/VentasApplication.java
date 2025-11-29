@@ -1,4 +1,4 @@
-package cl.bosqueantiguo.ventas;
+﻿package cl.bosqueantiguo.ventas;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

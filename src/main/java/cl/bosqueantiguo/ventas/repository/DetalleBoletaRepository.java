@@ -1,4 +1,4 @@
-package cl.bosqueantiguo.ventas.repository;
+﻿package cl.bosqueantiguo.ventas.repository;
 
 import cl.bosqueantiguo.ventas.model.DetalleBoleta;
 import org.springframework.data.jpa.repository.JpaRepository;

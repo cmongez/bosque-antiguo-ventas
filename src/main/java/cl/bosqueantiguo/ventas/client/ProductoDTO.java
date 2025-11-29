@@ -1,4 +1,4 @@
-package cl.bosqueantiguo.ventas.client;
+﻿package cl.bosqueantiguo.ventas.client;
 
 import lombok.Data;
 

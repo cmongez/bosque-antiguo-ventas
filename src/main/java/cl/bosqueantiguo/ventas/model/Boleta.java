@@ -1,4 +1,4 @@
-package cl.bosqueantiguo.ventas.model;
+﻿package cl.bosqueantiguo.ventas.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
