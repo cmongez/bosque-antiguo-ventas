@@ -1,4 +1,4 @@
-﻿package cl.bosqueantiguo.ventas.config;
+package cl.bosqueantiguo.ventas.config;
 
 // Importa las anotaciones de configuración de Spring
 import org.springframework.context.annotation.Bean;

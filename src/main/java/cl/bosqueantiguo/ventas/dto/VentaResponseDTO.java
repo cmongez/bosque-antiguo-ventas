@@ -1,4 +1,4 @@
-﻿package cl.bosqueantiguo.ventas.dto;
+package cl.bosqueantiguo.ventas.dto;
 
 import cl.bosqueantiguo.ventas.model.Boleta;
 import lombok.Data;

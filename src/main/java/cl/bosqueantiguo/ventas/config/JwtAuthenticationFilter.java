@@ -1,4 +1,4 @@
-﻿package cl.bosqueantiguo.ventas.config;
+package cl.bosqueantiguo.ventas.config;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

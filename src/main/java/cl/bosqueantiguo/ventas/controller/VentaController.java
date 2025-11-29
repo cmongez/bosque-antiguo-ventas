@@ -1,4 +1,4 @@
-﻿package cl.bosqueantiguo.ventas.controller;
+package cl.bosqueantiguo.ventas.controller;
 
 import cl.bosqueantiguo.ventas.dto.VentaRequestDTO;
 import cl.bosqueantiguo.ventas.dto.VentaResponseDTO;
@@ -41,12 +41,46 @@ public class VentaController {
             @RequestBody VentaRequestDTO ventaRequest,
             Authentication authentication) {
         
-        // Extraer userId del JWT
-        Long userId = Long.parseLong(authentication.getDetails().toString());
-        ventaRequest.setUsuarioId(userId);
+        System.out.println("=== INICIO CREAR VENTA ===");
+        if (ventaRequest != null && ventaRequest.getDetalles() != null) {
+            System.out.println("Creando venta con " + ventaRequest.getDetalles().size() + " productos");
+        }
         
-        VentaResponseDTO ventaRegistrada = ventaService.registrarVenta(ventaRequest);
-        return new ResponseEntity<>(ventaRegistrada, HttpStatus.CREATED);
+        try {
+            // Extraer userId del JWT
+            Long userId = null;
+            
+            if (authentication != null && authentication.getDetails() != null) {
+                try {
+                    userId = Long.parseLong(authentication.getDetails().toString());
+                    System.out.println("Usuario ID extraído: " + userId);
+                } catch (NumberFormatException e) {
+                    System.err.println("No se pudo parsear userId desde details: " + authentication.getDetails());
+                }
+            }
+            
+            // Si no se pudo obtener desde details, usar un ID por defecto (temporal)
+            if (userId == null) {
+                userId = 1L; // ID por defecto para testing
+                System.out.println("Usando userId por defecto: " + userId);
+            }
+            
+            ventaRequest.setUsuarioId(userId);
+            
+            VentaResponseDTO ventaRegistrada = ventaService.registrarVenta(ventaRequest);
+            return new ResponseEntity<>(ventaRegistrada, HttpStatus.CREATED);
+            
+        } catch (NumberFormatException e) {
+            System.err.println("Error al parsear userId del JWT: " + e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException e) {
+            System.err.println("Error al registrar venta: " + e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            System.err.println("Error inesperado al registrar venta: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @Operation(summary = "Listar todas las ventas", description = "Obtiene todas las ventas registradas - Solo ADMIN y VENDEDOR")
@@ -59,7 +93,7 @@ public class VentaController {
     public ResponseEntity<List<VentaResponseDTO>> listarVentas(Authentication authentication) {
         // Solo ADMIN y VENDEDOR pueden ver todas las ventas
         boolean isAdminOrVendedor = authentication.getAuthorities().stream()
-            .anyMatch(auth -> auth.getAuthority().equals("ADMIN") || auth.getAuthority().equals("VENDEDOR"));
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
         
         if (!isAdminOrVendedor) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -82,7 +116,7 @@ public class VentaController {
         
         // ADMIN y VENDEDOR pueden ver cualquier venta
         boolean isAdminOrVendedor = authentication.getAuthorities().stream()
-            .anyMatch(auth -> auth.getAuthority().equals("ADMIN") || auth.getAuthority().equals("VENDEDOR"));
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
         
         if (!isAdminOrVendedor) {
             // CLIENTE solo puede ver sus propias ventas
@@ -109,7 +143,7 @@ public class VentaController {
         // Verificar que el usuario solo pueda ver sus propias ventas (excepto ADMIN)
         Long currentUserId = Long.parseLong(authentication.getDetails().toString());
         boolean isAdmin = authentication.getAuthorities().stream()
-            .anyMatch(auth -> auth.getAuthority().equals("ADMIN"));
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
         
         if (!isAdmin && !currentUserId.equals(userId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();

@@ -1,4 +1,4 @@
-﻿package cl.bosqueantiguo.ventas.config;
+package cl.bosqueantiguo.ventas.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

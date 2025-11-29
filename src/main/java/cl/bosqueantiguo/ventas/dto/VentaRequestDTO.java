@@ -1,4 +1,4 @@
-﻿package cl.bosqueantiguo.ventas.dto;
+package cl.bosqueantiguo.ventas.dto;
 
 import lombok.Data;
 import java.util.List;

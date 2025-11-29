@@ -1,4 +1,4 @@
-﻿package cl.bosqueantiguo.ventas;
+package cl.bosqueantiguo.ventas;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
