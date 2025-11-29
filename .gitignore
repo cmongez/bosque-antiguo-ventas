@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Oracle Wallet (contiene credenciales sensibles) ###
+wallet/
+src/main/resources/wallet/
