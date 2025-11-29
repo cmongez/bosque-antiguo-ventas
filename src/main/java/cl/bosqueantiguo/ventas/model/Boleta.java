@@ -19,7 +19,8 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 public class Boleta {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "boleta_seq")
+    @SequenceGenerator(name = "boleta_seq", sequenceName = "BOLETA_SEQ", allocationSize = 1)
     private Long id;
 
     @CreationTimestamp

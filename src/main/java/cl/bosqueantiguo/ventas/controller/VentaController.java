@@ -59,7 +59,7 @@ public class VentaController {
     public ResponseEntity<List<VentaResponseDTO>> listarVentas(Authentication authentication) {
         // Solo ADMIN y VENDEDOR pueden ver todas las ventas
         boolean isAdminOrVendedor = authentication.getAuthorities().stream()
-            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
+            .anyMatch(auth -> auth.getAuthority().equals("ADMIN") || auth.getAuthority().equals("VENDEDOR"));
         
         if (!isAdminOrVendedor) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -82,7 +82,7 @@ public class VentaController {
         
         // ADMIN y VENDEDOR pueden ver cualquier venta
         boolean isAdminOrVendedor = authentication.getAuthorities().stream()
-            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
+            .anyMatch(auth -> auth.getAuthority().equals("ADMIN") || auth.getAuthority().equals("VENDEDOR"));
         
         if (!isAdminOrVendedor) {
             // CLIENTE solo puede ver sus propias ventas
@@ -109,7 +109,7 @@ public class VentaController {
         // Verificar que el usuario solo pueda ver sus propias ventas (excepto ADMIN)
         Long currentUserId = Long.parseLong(authentication.getDetails().toString());
         boolean isAdmin = authentication.getAuthorities().stream()
-            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+            .anyMatch(auth -> auth.getAuthority().equals("ADMIN"));
         
         if (!isAdmin && !currentUserId.equals(userId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
