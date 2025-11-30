@@ -17,15 +17,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/sales") 
+@RequestMapping("/api/v1/sales")
 @CrossOrigin(origins = "*") // Permite CORS
 @Tag(name = "Ventas", description = "Gestión de órdenes y ventas")
-@SecurityRequirement(name = "bearerAuth") 
+@SecurityRequirement(name = "bearerAuth")
 public class VentaController {
+
+    private static final Logger logger = LoggerFactory.getLogger(VentaController.class);
 
     @Autowired
     private VentaService ventaService;
@@ -40,16 +44,16 @@ public class VentaController {
     public ResponseEntity<VentaResponseDTO> registrarVenta(
             @RequestBody VentaRequestDTO ventaRequest,
             Authentication authentication) {
-        
+
         System.out.println("=== INICIO CREAR VENTA ===");
         if (ventaRequest != null && ventaRequest.getDetalles() != null) {
             System.out.println("Creando venta con " + ventaRequest.getDetalles().size() + " productos");
         }
-        
+
         try {
             // Extraer userId del JWT
             Long userId = null;
-            
+
             if (authentication != null && authentication.getDetails() != null) {
                 try {
                     userId = Long.parseLong(authentication.getDetails().toString());
@@ -58,18 +62,18 @@ public class VentaController {
                     System.err.println("No se pudo parsear userId desde details: " + authentication.getDetails());
                 }
             }
-            
+
             // Si no se pudo obtener desde details, usar un ID por defecto (temporal)
             if (userId == null) {
                 userId = 1L; // ID por defecto para testing
                 System.out.println("Usando userId por defecto: " + userId);
             }
-            
+
             ventaRequest.setUsuarioId(userId);
-            
+
             VentaResponseDTO ventaRegistrada = ventaService.registrarVenta(ventaRequest);
             return new ResponseEntity<>(ventaRegistrada, HttpStatus.CREATED);
-            
+
         } catch (NumberFormatException e) {
             System.err.println("Error al parsear userId del JWT: " + e.getMessage());
             return ResponseEntity.badRequest().build();
@@ -94,11 +98,11 @@ public class VentaController {
         // Solo ADMIN y VENDEDOR pueden ver todas las ventas
         boolean isAdminOrVendedor = authentication.getAuthorities().stream()
             .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
-        
+
         if (!isAdminOrVendedor) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        
+
         List<VentaResponseDTO> ventas = ventaService.listarVentas();
         return ResponseEntity.ok(ventas);
     }
@@ -113,11 +117,11 @@ public class VentaController {
     @GetMapping("/{id}")
     public ResponseEntity<VentaResponseDTO> obtenerVentaPorId(@PathVariable Long id, Authentication authentication) {
         VentaResponseDTO venta = ventaService.obtenerVentaPorId(id);
-        
+
         // ADMIN y VENDEDOR pueden ver cualquier venta
         boolean isAdminOrVendedor = authentication.getAuthorities().stream()
             .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ROLE_VENDEDOR"));
-        
+
         if (!isAdminOrVendedor) {
             // CLIENTE solo puede ver sus propias ventas
             Long currentUserId = Long.parseLong(authentication.getDetails().toString());
@@ -125,7 +129,7 @@ public class VentaController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
         }
-        
+
         return ResponseEntity.ok(venta);
     }
 
@@ -139,20 +143,41 @@ public class VentaController {
     public ResponseEntity<List<VentaResponseDTO>> listarVentasPorUsuario(
             @PathVariable Long userId,
             Authentication authentication) {
-        
+
         // Verificar que el usuario solo pueda ver sus propias ventas (excepto ADMIN)
-        Long currentUserId = Long.parseLong(authentication.getDetails().toString());
-        boolean isAdmin = authentication.getAuthorities().stream()
-            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
-        
-        if (!isAdmin && !currentUserId.equals(userId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            Long currentUserId;
+
+            // Intentar obtener userId desde los detalles
+            if (authentication.getDetails() != null && !authentication.getDetails().toString().equals("null")) {
+                currentUserId = Long.parseLong(authentication.getDetails().toString());
+            } else {
+                // El JWT no incluye userId, pero tenemos el email como subject
+                String email = authentication.getName();
+                logger.info("Obteniendo userId para email: {}", email);
+
+                currentUserId = ventaService.obtenerUserIdPorEmail(email);
+                if (currentUserId == null) {
+                    logger.error("No se encontró usuario con email: {}", email);
+                    return ResponseEntity.badRequest().build();
+                }
+            }
+
+            boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+
+            if (!isAdmin && !currentUserId.equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+        } catch (NumberFormatException e) {
+            logger.error("Error al convertir userId a Long: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
-        
+
         List<VentaResponseDTO> ventas = ventaService.listarVentasPorUsuario(userId);
         return ResponseEntity.ok(ventas);
     }
-    
+
     @Operation(summary = "Listar mis compras", description = "Obtiene el historial de compras del usuario autenticado")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Historial de compras obtenido",
@@ -160,9 +185,54 @@ public class VentaController {
     })
     @GetMapping("/mis-compras")
     public ResponseEntity<List<VentaResponseDTO>> listarMisCompras(Authentication authentication) {
-        Long userId = Long.parseLong(authentication.getDetails().toString());
-        List<VentaResponseDTO> ventas = ventaService.listarVentasPorUsuario(userId);
-        return ResponseEntity.ok(ventas);
+        try {
+            logger.info("=== DEBUG LISTAR MIS COMPRAS ===");
+            logger.info("Authentication name: {}", authentication.getName());
+            logger.info("Authentication details: {}", authentication.getDetails());
+            logger.info("Authentication authorities: {}", authentication.getAuthorities());
+
+            Long userId;
+
+            // Intentar obtener userId desde los detalles
+            if (authentication.getDetails() != null && !authentication.getDetails().toString().equals("null")) {
+                String userIdStr = authentication.getDetails().toString();
+                logger.info("UserId desde details: {}", userIdStr);
+                userId = Long.parseLong(userIdStr);
+            } else {
+                // El JWT no incluye userId, pero tenemos el email como subject
+                String email = authentication.getName();
+                logger.info("Obteniendo compras para usuario con email: {}", email);
+
+                // Buscar usuario por email usando el servicio de ventas
+                userId = ventaService.obtenerUserIdPorEmail(email);
+                logger.info("UserId obtenido por email: {}", userId);
+                if (userId == null) {
+                    logger.error("No se encontró usuario con email: {}", email);
+                    return ResponseEntity.badRequest().build();
+                }
+            }
+
+            logger.info("UserId final para buscar: {}", userId);
+
+            // Debug temporal: listar todas las boletas para ver qué hay en la BD
+            if (ventaService instanceof cl.bosqueantiguo.ventas.service.VentaServiceImpl) {
+                ((cl.bosqueantiguo.ventas.service.VentaServiceImpl) ventaService).debugListarTodasLasBoletas();
+            }
+
+            List<VentaResponseDTO> ventas = ventaService.listarVentasPorUsuario(userId);
+            logger.info("Número de ventas encontradas: {}", ventas.size());
+
+            return ResponseEntity.ok(ventas);
+
+        } catch (NumberFormatException e) {
+            logger.error("Error al convertir userId a Long: {}. Authentication name: {}, details: {}",
+                e.getMessage(), authentication.getName(), authentication.getDetails());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            logger.error("Error al obtener las compras del usuario: {}. Authentication: {}",
+                e.getMessage(), authentication);
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     // DELETE /api/v1/sales/{id}
