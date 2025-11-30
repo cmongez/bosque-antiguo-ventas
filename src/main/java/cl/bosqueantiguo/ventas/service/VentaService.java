@@ -7,12 +7,14 @@ import java.util.List;
 public interface VentaService {
 
     VentaResponseDTO registrarVenta(VentaRequestDTO ventaRequest);
-    
+
     List<VentaResponseDTO> listarVentas();
-    
+
     VentaResponseDTO obtenerVentaPorId(Long id);
-    
+
     List<VentaResponseDTO> listarVentasPorUsuario(Long userId);
-    
+
+    Long obtenerUserIdPorEmail(String email);
+
     void anularVenta(Long id);
 }

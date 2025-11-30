@@ -20,41 +20,83 @@ public class VentaServiceImpl implements VentaService {
     @Autowired
     private BoletaRepository boletaRepository;
 
+    @Autowired
+    private cl.bosqueantiguo.ventas.client.ProductoClient productoClient;
+
     @Override
-    @Transactional // Asegura que toda la operación (guardar boleta y detalles) sea atómica
+    @Transactional // Asegura que toda la operación sea atómica y haga rollback si hay errores
     public VentaResponseDTO registrarVenta(VentaRequestDTO ventaRequest) {
-        
+
+        System.out.println("=== INICIANDO REGISTRO DE VENTA ===");
+        System.out.println("Usuario ID: " + ventaRequest.getUsuarioId());
+        System.out.println("Cantidad de productos: " + ventaRequest.getDetalles().size());
+
         Boleta boleta = new Boleta();
         boleta.setUsuarioId(ventaRequest.getUsuarioId());
-        
+
         double totalVenta = 0.0;
         List<DetalleBoleta> detalles = new ArrayList<>();
 
+        // Validar todos los productos ANTES de realizar descuentos de stock
+        for (VentaRequestDTO.DetalleRequestDTO detalleRequest : ventaRequest.getDetalles()) {
+            System.out.println("Validando producto ID: " + detalleRequest.getProductoId() + ", cantidad: " + detalleRequest.getCantidad());
+
+            cl.bosqueantiguo.ventas.client.ProductoDTO producto = productoClient.getProducto(detalleRequest.getProductoId());
+
+            if (producto == null) {
+                System.err.println("ERROR: Producto no encontrado con ID: " + detalleRequest.getProductoId());
+                throw new RuntimeException("Producto no encontrado: " + detalleRequest.getProductoId());
+            }
+
+            System.out.println("Producto encontrado: " + producto.getNombre() + ", disponible: " + producto.getDisponible() + ", stock: " + producto.getStock());
+
+            if (!producto.getDisponible()) {
+                System.err.println("ERROR: Producto no disponible: " + producto.getNombre());
+                throw new RuntimeException("Producto no disponible: " + producto.getNombre());
+            }
+
+            if (producto.getStock() < detalleRequest.getCantidad()) {
+                System.err.println("ERROR: Stock insuficiente para " + producto.getNombre() +
+                    ". Disponible: " + producto.getStock() + ", solicitado: " + detalleRequest.getCantidad());
+                throw new RuntimeException("Stock insuficiente para el producto: " + producto.getNombre() +
+                    ". Stock disponible: " + producto.getStock() + ", solicitado: " + detalleRequest.getCantidad());
+            }
+        }
+
+        // Si todas las validaciones pasan, proceder con la venta y descuento de stock
         for (VentaRequestDTO.DetalleRequestDTO detalleRequest : ventaRequest.getDetalles()) {
 
-            double precioProducto = 50.0; 
-            
-            // 2. Calcular subtotal
-            double subtotal = precioProducto * detalleRequest.getCantidad();
-            
+            // 1. Obtener producto (ya validado anteriormente)
+            cl.bosqueantiguo.ventas.client.ProductoDTO producto = productoClient.getProducto(detalleRequest.getProductoId());
+
+            // 2. Calcular subtotal con precio real
+            double subtotal = producto.getPrecio() * detalleRequest.getCantidad();
+
             // 3. Crear el detalle
             DetalleBoleta detalle = new DetalleBoleta();
             detalle.setProductoId(detalleRequest.getProductoId());
             detalle.setCantidad(detalleRequest.getCantidad());
             detalle.setSubtotal(subtotal);
-            detalle.setBoleta(boleta); // Asociar detalle con la boleta
-            
+            detalle.setBoleta(boleta);
+
             detalles.add(detalle);
             totalVenta += subtotal;
 
+            // 4. Descontar stock del producto - Si falla, @Transactional hace rollback automático
+            try {
+                productoClient.reducirStock(detalleRequest.getProductoId(), detalleRequest.getCantidad());
+            } catch (Exception e) {
+                // El @Transactional hace rollback de la base de datos automáticamente
+                throw new RuntimeException("Error al procesar la venta. Stock no pudo ser actualizado para: " + producto.getNombre(), e);
+            }
         }
-        
+
         boleta.setTotal(totalVenta);
         boleta.setDetalles(detalles);
-        
+
         // Guardamos la boleta. Gracias a CascadeType.ALL, los detalles se guardan automáticamente.
         Boleta boletaGuardada = boletaRepository.save(boleta);
-        
+
         return new VentaResponseDTO(boletaGuardada);
     }
 
@@ -74,9 +116,78 @@ public class VentaServiceImpl implements VentaService {
 
     @Override
     public List<VentaResponseDTO> listarVentasPorUsuario(Long userId) {
-        return boletaRepository.findByUsuarioId(userId).stream()
+        System.out.println("=== DEBUG LISTAR VENTAS POR USUARIO ===");
+        System.out.println("Buscando ventas para userId: " + userId);
+
+        List<Boleta> boletas = boletaRepository.findByUsuarioId(userId);
+        System.out.println("Número de boletas encontradas en BD: " + boletas.size());
+
+        // Mostrar detalles de cada boleta encontrada
+        for (int i = 0; i < boletas.size(); i++) {
+            Boleta boleta = boletas.get(i);
+            System.out.println("Boleta " + (i+1) + ": ID=" + boleta.getId() +
+                             ", UsuarioId=" + boleta.getUsuarioId() +
+                             ", Total=" + boleta.getTotal() +
+                             ", Fecha=" + boleta.getFecha());
+        }
+
+        List<VentaResponseDTO> result = boletas.stream()
                 .map(VentaResponseDTO::new)
                 .collect(Collectors.toList());
+
+        System.out.println("Número de VentaResponseDTO devueltos: " + result.size());
+        return result;
+    }
+
+    @Override
+    public Long obtenerUserIdPorEmail(String email) {
+        // TODO: Implementar llamada al microservicio de usuarios para obtener userId por email
+        // Por ahora, implementación temporal basada en emails conocidos
+
+        System.out.println("=== DEBUG OBTENER USER ID POR EMAIL ===");
+        System.out.println("Email recibido: '" + email + "'");
+        System.out.println("Email en minúsculas: '" + email.toLowerCase() + "'");
+
+        Long userId;
+        switch (email.toLowerCase()) {
+            case "admin@gmail.com":
+            case "admin@bosqueantiguo.cl":
+                userId = 1L; // Usuario admin
+                break;
+            case "vendedor@gmail.com":
+            case "vendedor@bosqueantiguo.cl":
+                userId = 2L; // Usuario vendedor
+                break;
+            case "cliente@gmail.com":
+            case "cliente@bosqueantiguo.cl":
+                userId = 3L; // Usuario cliente
+                break;
+            default:
+                // Por ahora retornamos null si no encontramos el usuario
+                // TODO: Implementar búsqueda en base de datos o llamada a microservicio de usuarios
+                System.out.println("Usuario no encontrado con email: " + email);
+                userId = null;
+                break;
+        }
+
+        System.out.println("UserId devuelto: " + userId);
+        return userId;
+    }
+
+    // Método temporal para debug - listar todas las boletas
+    public void debugListarTodasLasBoletas() {
+        System.out.println("=== DEBUG TODAS LAS BOLETAS ===");
+        List<Boleta> todasLasBoletas = boletaRepository.findAll();
+        System.out.println("Total de boletas en BD: " + todasLasBoletas.size());
+
+        for (Boleta boleta : todasLasBoletas) {
+            System.out.println("Boleta ID=" + boleta.getId() +
+                             ", UsuarioId=" + boleta.getUsuarioId() +
+                             ", Total=" + boleta.getTotal() +
+                             ", Fecha=" + boleta.getFecha() +
+                             ", Detalles=" + (boleta.getDetalles() != null ? boleta.getDetalles().size() : 0));
+        }
+        System.out.println("=== FIN DEBUG TODAS LAS BOLETAS ===");
     }
 
     @Override
@@ -84,7 +195,10 @@ public class VentaServiceImpl implements VentaService {
     public void anularVenta(Long id) {
         Boleta boleta = boletaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Boleta no encontrada con id: " + id));
-        
+
+        // --- LÓGICA DE NEGOCIO ADICIONAL ---
+        // Aquí deberíamos llamar al microservicio de Productos para reponer el stock
+        // de los productos en boleta.getDetalles()
 
         boletaRepository.delete(boleta);
     }

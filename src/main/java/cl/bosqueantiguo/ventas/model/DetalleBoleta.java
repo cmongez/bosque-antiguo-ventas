@@ -15,7 +15,8 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 public class DetalleBoleta {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "detalle_boleta_seq")
+    @SequenceGenerator(name = "detalle_boleta_seq", sequenceName = "DETALLE_BOLETA_SEQ", allocationSize = 1)
     private Long id;
 
     // ID del producto (del microservicio de Productos)
