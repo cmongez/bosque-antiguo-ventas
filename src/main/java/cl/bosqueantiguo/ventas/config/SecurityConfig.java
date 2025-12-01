@@ -33,7 +33,7 @@ public class SecurityConfig {
                 // Crear venta: todos los usuarios autenticados
                 .requestMatchers("POST", "/api/v1/sales").authenticated()
                 // Listar todas las ventas: solo ADMIN y VENDEDOR
-                .requestMatchers("GET", "/api/v1/sales").hasAnyRole("ADMIN", "VENDEDOR") 
+                .requestMatchers("GET", "/api/v1/sales").hasAnyRole("ADMIN", "VENDEDOR")
                 // Mis compras: todos los autenticados
                 .requestMatchers("GET", "/api/v1/sales/mis-compras").hasAnyRole("CLIENTE", "VENDEDOR", "ADMIN")
                 // Ventas por usuario: ADMIN puede ver de cualquiera, otros solo las suyas
@@ -56,11 +56,11 @@ public class SecurityConfig {
         // ORÍGENES PERMITIDOS (DEV + PROD)
         configuration.setAllowedOrigins(List.of(
             "http://localhost:5173",
-            "https://mi-bucket-s3.amazonaws.com",
-            "https://mi-dominio.com"
+            "http://bosque-antiguo-front.s3-website-us-east-1.amazonaws.com",
+            "https://bosque-antiguo-front.s3-website-us-east-1.amazonaws.com"
         ));
-        
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH"));
+
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
